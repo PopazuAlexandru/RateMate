@@ -387,6 +387,12 @@ class AppData extends ChangeNotifier {
     }
   }
 
+  void deleteReview(String reviewId) {
+    _reviews.removeWhere((r) => r.id == reviewId);
+    _saveReviews();
+    notifyListeners();
+  }
+
   // User Management (Admin)
   void blockUser(String userId, bool blocked) {
     final userIndex = _users.indexWhere((u) => u.id == userId);
@@ -432,11 +438,23 @@ class AppData extends ChangeNotifier {
     }
   }
 
-  List<Review> getReviewsFor(String userId) => _reviews
-      .where(
-        (r) => r.targetUserId == userId && r.status == ReviewStatus.approved,
-      )
-      .toList();
+  List<Review> getReviewsFor(String userId, {bool includePending = true}) {
+    return _reviews.where((r) {
+      if (r.targetUserId != userId) return false;
+      if (r.status == ReviewStatus.approved) return true;
+      return includePending && r.status == ReviewStatus.pending;
+    }).toList();
+  }
+
+  bool hasPendingReviewForUser(String userId, String? submitterUserId) {
+    if (submitterUserId == null) return false;
+    return _reviews.any(
+      (r) =>
+          r.targetUserId == userId &&
+          r.submitterUserId == submitterUserId &&
+          r.status == ReviewStatus.pending,
+    );
+  }
 
   List<Review> getPendingReviews() =>
       _reviews.where((r) => r.status == ReviewStatus.pending).toList();
@@ -557,7 +575,7 @@ class _RateMateAppState extends State<RateMateApp> with WidgetsBindingObserver {
     if (data.users.isEmpty) {
       // Register Alexandru first
       data.register(
-        'Alexandru Popazu',
+        'Popazu Alexandru',
         'alexandru.popazu@gmail.com',
         'Alexandru1111',
       );
@@ -812,9 +830,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Welcome, ${current.name}!',
-              style: Theme.of(context).textTheme.headlineSmall,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome, ${current.name}!',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                if (current.isAdmin) ...[
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AdminPanelScreen(appData: widget.appData),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.admin_panel_settings),
+                    label: const Text('Admin Settings'),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 16),
             TextField(
@@ -1007,21 +1045,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         ),
       ),
-      floatingActionButton: ScaleTransition(
-        scale: _fabAnimation,
-        child: FloatingActionButton(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    ProfileScreen(appData: widget.appData, targetUser: current),
+      floatingActionButton: current.isAdmin
+          ? ScaleTransition(
+              scale: _fabAnimation,
+              child: FloatingActionButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AdminPanelScreen(appData: widget.appData),
+                    ),
+                  );
+                },
+                tooltip: 'Admin Settings',
+                child: const Icon(Icons.admin_panel_settings),
               ),
-            );
-          },
-          tooltip: 'My Profile',
-          child: const Icon(Icons.person),
-        ),
-      ),
+            )
+          : null,
     );
   }
 }
@@ -1139,7 +1178,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final reviews = widget.appData.getReviewsFor(widget.targetUser.id);
+    final currentUser = widget.appData.currentUser;
+    final approvedReviews = widget.appData.getReviewsFor(
+      widget.targetUser.id,
+      includePending: false,
+    );
+    final showPendingReviews =
+        currentUser?.isAdmin == true ||
+        currentUser?.id == widget.targetUser.id ||
+        widget.appData.hasPendingReviewForUser(
+          widget.targetUser.id,
+          currentUser?.id,
+        );
+    final reviews = widget.appData.getReviewsFor(
+      widget.targetUser.id,
+      includePending: showPendingReviews,
+    );
     final avgRating = widget.appData.averageRating(widget.targetUser.id);
     final tag = widget.appData.getUserTag(widget.targetUser.id);
     return Scaffold(
@@ -1160,7 +1214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Average rating: ${avgRating.toStringAsFixed(2)} / 5 (${reviews.length} reviews)',
+              "Average rating: ${avgRating.toStringAsFixed(2)} / 5 (${approvedReviews.length} approved reviews${reviews.length > approvedReviews.length ? ' + ${reviews.length - approvedReviews.length} pending' : ''})",
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
@@ -1224,22 +1278,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   : ListView.builder(
                       itemCount: reviews.length,
                       itemBuilder: (context, index) {
-                        final r = reviews[index];
+                        final review = reviews[index];
                         return Card(
                           child: ListTile(
                             title: Row(
                               children: [
-                                for (var i = 0; i < r.rating; i++)
+                                for (var i = 0; i < review.rating; i++)
                                   const Icon(
                                     Icons.star,
                                     size: 16,
                                     color: Colors.orange,
                                   ),
+                                if (review.status == ReviewStatus.pending) ...[
+                                  const SizedBox(width: 8),
+                                  const Chip(
+                                    label: Text('Pending'),
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                ],
                               ],
                             ),
-                            subtitle: Text(r.comment),
+                            subtitle: Text(review.comment),
                             trailing: Text(
-                              '${r.timestamp.month}/${r.timestamp.day}/${r.timestamp.year}',
+                              '${review.timestamp.month}/${review.timestamp.day}/${review.timestamp.year}',
                             ),
                           ),
                         );
@@ -1269,12 +1330,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   Widget build(BuildContext context) {
     final currentUser = widget.appData.currentUser;
 
-    // Only Alexandru Popazu can access admin settings
-    if (currentUser?.email != 'alexandru.popazu@gmail.com') {
+    if (currentUser?.isAdmin != true) {
       return Scaffold(
         appBar: AppBar(title: const Text('Access Denied')),
         body: const Center(
-          child: Text('Only Alexandru Popazu can access admin settings'),
+          child: Text('Admin access is required to open admin settings.'),
         ),
       );
     }
@@ -1395,7 +1455,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   Widget _buildReviewModeration() {
-    final pendingReviews = widget.appData.getPendingReviews();
+    final allReviews = widget.appData.reviews;
+    final pendingCount = allReviews
+        .where((review) => review.status == ReviewStatus.pending)
+        .length;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -1403,17 +1466,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Review Moderation (${pendingReviews.length} pending)',
+            'Review Moderation (${allReviews.length} total, $pendingCount pending)',
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: pendingReviews.isEmpty
-                ? const Center(child: Text('No reviews pending moderation'))
+            child: allReviews.isEmpty
+                ? const Center(child: Text('No reviews yet'))
                 : ListView.builder(
-                    itemCount: pendingReviews.length,
+                    itemCount: allReviews.length,
                     itemBuilder: (context, index) {
-                      final review = pendingReviews[index];
+                      final review = allReviews[index];
                       final targetUser = widget.appData.users.firstWhere(
                         (u) => u.id == review.targetUserId,
                         orElse: () => User(
@@ -1423,6 +1486,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                           password: '',
                         ),
                       );
+                      final statusLabel = review.status == ReviewStatus.pending
+                          ? 'Pending'
+                          : review.status == ReviewStatus.approved
+                          ? 'Approved'
+                          : 'Rejected';
 
                       return Card(
                         child: Padding(
@@ -1436,36 +1504,50 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              Text('Status: $statusLabel'),
                               Text('Rating: ${review.rating}/5'),
                               Text('Comment: ${review.comment}'),
                               Text('Submitted: ${review.timestamp.toString()}'),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
+                                  if (review.status ==
+                                      ReviewStatus.pending) ...[
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        widget.appData.moderateReview(
+                                          review.id,
+                                          ReviewStatus.approved,
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                      ),
+                                      child: const Text('Approve'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        widget.appData.moderateReview(
+                                          review.id,
+                                          ReviewStatus.rejected,
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                      ),
+                                      child: const Text('Reject'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
                                   ElevatedButton(
                                     onPressed: () {
-                                      widget.appData.moderateReview(
-                                        review.id,
-                                        ReviewStatus.approved,
-                                      );
+                                      widget.appData.deleteReview(review.id);
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
+                                      backgroundColor: Colors.redAccent,
                                     ),
-                                    child: const Text('Approve'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      widget.appData.moderateReview(
-                                        review.id,
-                                        ReviewStatus.rejected,
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                    ),
-                                    child: const Text('Reject'),
+                                    child: const Text('Delete'),
                                   ),
                                 ],
                               ),
