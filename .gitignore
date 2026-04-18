@@ -46,3 +46,6 @@ app.*.map.json
 
 # Sensitive files
 user_accounts.txt
+
+# Database
+hive_db/

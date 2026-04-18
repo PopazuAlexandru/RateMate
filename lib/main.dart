@@ -8,7 +8,7 @@ part 'main.g.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
+  await Hive.init('hive_db');
   Hive.registerAdapter(UserAdapter());
   Hive.registerAdapter(ReviewAdapter());
   runApp(const RateMateApp());
@@ -61,6 +61,7 @@ class Review {
 class AppData extends ChangeNotifier {
   late Box<User> _userBox;
   late Box<Review> _reviewBox;
+  late Box<String> _currentUserBox;
 
   final List<User> _users = [];
   final List<Review> _reviews = [];
@@ -70,6 +71,7 @@ class AppData extends ChangeNotifier {
   Future<void> init() async {
     _userBox = await Hive.openBox<User>('users');
     _reviewBox = await Hive.openBox<Review>('reviews');
+    _currentUserBox = await Hive.openBox<String>('currentUser');
     _loadData();
   }
 
@@ -78,6 +80,13 @@ class AppData extends ChangeNotifier {
     _users.addAll(_userBox.values);
     _reviews.clear();
     _reviews.addAll(_reviewBox.values);
+    final currentUserId = _currentUserBox.get('id');
+    if (currentUserId != null) {
+      currentUser = _users.firstWhere(
+        (u) => u.id == currentUserId,
+        orElse: () => null,
+      );
+    }
     notifyListeners();
   }
 
@@ -125,12 +134,14 @@ class AppData extends ChangeNotifier {
     );
     if (user.id.isEmpty) return false;
     currentUser = user;
+    _currentUserBox.put('id', user.id);
     notifyListeners();
     return true;
   }
 
   void logout() {
     currentUser = null;
+    _currentUserBox.delete('id');
     notifyListeners();
   }
 
