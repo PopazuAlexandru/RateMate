@@ -555,13 +555,23 @@ class _RateMateAppState extends State<RateMateApp> with WidgetsBindingObserver {
     await data.init();
     // If no users, add initial ones
     if (data.users.isEmpty) {
+      // Register Alexandru first
       data.register(
         'Alexandru Popazu',
         'alexandru.popazu@gmail.com',
         'Alexandru1111',
       );
-      // Make Alexandru Popazu an admin
-      data.makeAdmin(data.users.first.id, true);
+
+      // Find Alexandru's ID and make him admin
+      final alexUser = data.users.firstWhere(
+        (u) => u.email == 'alexandru.popazu@gmail.com',
+        orElse: () => User(id: '', name: '', email: '', password: ''),
+      );
+      if (alexUser.id.isNotEmpty) {
+        data.makeAdmin(alexUser.id, true);
+      }
+
+      // Register other users
       data.register('Ana Maria', 'ana.maria@gmail.com', 'password1234');
       data.register(
         'Rares Opritescu',
@@ -923,88 +933,71 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeInOut,
                           margin: const EdgeInsets.only(bottom: 8),
-                          child: Dismissible(
-                            key: Key(user.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              color: Colors.blue,
-                              child: const Icon(
-                                Icons.rate_review,
-                                color: Colors.white,
+                          child: Card(
+                            elevation: 2,
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: user.profilePicturePath != null
+                                    ? FileImage(File(user.profilePicturePath!))
+                                    : null,
+                                child: user.profilePicturePath == null
+                                    ? Text(user.name[0].toUpperCase())
+                                    : null,
                               ),
-                            ),
-
-                            child: Card(
-                              elevation: 2,
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage:
-                                      user.profilePicturePath != null
-                                      ? FileImage(
-                                          File(user.profilePicturePath!),
-                                        )
-                                      : null,
-                                  child: user.profilePicturePath == null
-                                      ? Text(user.name[0].toUpperCase())
-                                      : null,
-                                ),
-                                title: Text(user.name),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
+                              title: Text(user.name),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Rating: ${avgRating.toStringAsFixed(1)} / 5 from ${widget.appData.getReviewsFor(user.id).length} reviews',
+                                  ),
+                                  Text('Tag: $tag'),
+                                  if (user.tags.isNotEmpty)
                                     Text(
-                                      'Rating: ${avgRating.toStringAsFixed(1)} / 5 from ${widget.appData.getReviewsFor(user.id).length} reviews',
+                                      'Tags: ${user.tags.join(", ")}',
+                                      style: const TextStyle(fontSize: 12),
                                     ),
-                                    Text('Tag: $tag'),
-                                    if (user.tags.isNotEmpty)
-                                      Text(
-                                        'Tags: ${user.tags.join(", ")}',
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                  ],
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        isFollowing
-                                            ? Icons.person_remove
-                                            : Icons.person_add,
-                                        color: isFollowing
-                                            ? Colors.red
-                                            : Colors.green,
-                                      ),
-                                      onPressed: () {
-                                        if (isFollowing) {
-                                          widget.appData.unfollowUser(
-                                            current.id,
-                                            user.id,
-                                          );
-                                        } else {
-                                          widget.appData.followUser(
-                                            current.id,
-                                            user.id,
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    const Icon(Icons.arrow_forward_ios),
-                                  ],
-                                ),
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => ProfileScreen(
-                                        appData: widget.appData,
-                                        targetUser: user,
-                                      ),
-                                    ),
-                                  );
-                                },
+                                ],
                               ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      isFollowing
+                                          ? Icons.person_remove
+                                          : Icons.person_add,
+                                      color: isFollowing
+                                          ? Colors.red
+                                          : Colors.green,
+                                    ),
+                                    onPressed: () {
+                                      if (isFollowing) {
+                                        widget.appData.unfollowUser(
+                                          current.id,
+                                          user.id,
+                                        );
+                                      } else {
+                                        widget.appData.followUser(
+                                          current.id,
+                                          user.id,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  const Icon(Icons.arrow_forward_ios),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ProfileScreen(
+                                      appData: widget.appData,
+                                      targetUser: user,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         );
