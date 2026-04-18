@@ -138,9 +138,13 @@ class AppData extends ChangeNotifier {
   }
 
   void _saveReviews() {
-    _reviewBox.clear();
-    for (var review in _reviews) {
-      _reviewBox.put(review.id, review);
+    try {
+      _reviewBox.clear();
+      for (var review in _reviews) {
+        _reviewBox.put(review.id, review);
+      }
+    } catch (e) {
+      // Error saving reviews - data may not persist
     }
   }
 
@@ -551,6 +555,13 @@ class _RateMateAppState extends State<RateMateApp> with WidgetsBindingObserver {
     await data.init();
     // If no users, add initial ones
     if (data.users.isEmpty) {
+      data.register(
+        'Alexandru Popazu',
+        'alexandru.popazu@gmail.com',
+        'Alexandru1111',
+      );
+      // Make Alexandru Popazu an admin
+      data.makeAdmin(data.users.first.id, true);
       data.register('Ana Maria', 'ana.maria@gmail.com', 'password1234');
       data.register(
         'Rares Opritescu',
@@ -924,16 +935,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 color: Colors.white,
                               ),
                             ),
-                            onDismissed: (direction) {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ProfileScreen(
-                                    appData: widget.appData,
-                                    targetUser: user,
-                                  ),
-                                ),
-                              );
-                            },
+
                             child: Card(
                               elevation: 2,
                               child: ListTile(
@@ -1272,8 +1274,20 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = widget.appData.currentUser;
+
+    // Only Alexandru Popazu can access admin settings
+    if (currentUser?.email != 'alexandru.popazu@gmail.com') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Access Denied')),
+        body: const Center(
+          child: Text('Only Alexandru Popazu can access admin settings'),
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Panel')),
+      appBar: AppBar(title: const Text('Admin Moderator Settings')),
       body: Row(
         children: [
           NavigationRail(
