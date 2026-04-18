@@ -8,7 +8,7 @@ part 'main.g.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.init('hive_db');
+  await Hive.initFlutter('hive_db');
   Hive.registerAdapter(UserAdapter());
   Hive.registerAdapter(ReviewAdapter());
   runApp(const RateMateApp());
@@ -75,18 +75,19 @@ class AppData extends ChangeNotifier {
     _loadData();
   }
 
+  Future<void> dispose() async {
+    await _userBox.close();
+    await _reviewBox.close();
+    await _currentUserBox.close();
+  }
+
   void _loadData() {
     _users.clear();
     _users.addAll(_userBox.values);
     _reviews.clear();
     _reviews.addAll(_reviewBox.values);
-    final currentUserId = _currentUserBox.get('id');
-    if (currentUserId != null) {
-      currentUser = _users.firstWhere(
-        (u) => u.id == currentUserId,
-        orElse: () => null,
-      );
-    }
+    // Always start with no logged-in user to require login on app startup
+    currentUser = null;
     notifyListeners();
   }
 
@@ -216,14 +217,29 @@ class RateMateApp extends StatefulWidget {
   State<RateMateApp> createState() => _RateMateAppState();
 }
 
-class _RateMateAppState extends State<RateMateApp> {
+class _RateMateAppState extends State<RateMateApp> with WidgetsBindingObserver {
   final AppData data = AppData();
   bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    data.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      data.dispose();
+    }
   }
 
   Future<void> _initializeData() async {
