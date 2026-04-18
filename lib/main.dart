@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
 
-void main() {
+part 'main.g.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  Hive.registerAdapter(UserAdapter());
+  Hive.registerAdapter(ReviewAdapter());
   runApp(const RateMateApp());
 }
 
 final _uuid = Uuid();
 
+@HiveType(typeId: 0)
 class User {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String name;
+  @HiveField(2)
   final String email;
+  @HiveField(3)
   final String password;
   User({
     required this.id,
@@ -21,12 +34,19 @@ class User {
   });
 }
 
+@HiveType(typeId: 1)
 class Review {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String targetUserId;
+  @HiveField(2)
   final String? submitterUserId;
+  @HiveField(3)
   final int rating;
+  @HiveField(4)
   final String comment;
+  @HiveField(5)
   final DateTime timestamp;
   Review({
     required this.id,
@@ -39,10 +59,41 @@ class Review {
 }
 
 class AppData extends ChangeNotifier {
+  late Box<User> _userBox;
+  late Box<Review> _reviewBox;
+
   final List<User> _users = [];
   final List<Review> _reviews = [];
 
   User? currentUser;
+
+  Future<void> init() async {
+    _userBox = await Hive.openBox<User>('users');
+    _reviewBox = await Hive.openBox<Review>('reviews');
+    _loadData();
+  }
+
+  void _loadData() {
+    _users.clear();
+    _users.addAll(_userBox.values);
+    _reviews.clear();
+    _reviews.addAll(_reviewBox.values);
+    notifyListeners();
+  }
+
+  void _saveUsers() {
+    _userBox.clear();
+    for (var user in _users) {
+      _userBox.put(user.id, user);
+    }
+  }
+
+  void _saveReviews() {
+    _reviewBox.clear();
+    for (var review in _reviews) {
+      _reviewBox.put(review.id, review);
+    }
+  }
 
   List<User> get users => List.unmodifiable(_users);
   List<Review> get reviews => List.unmodifiable(_reviews);
@@ -60,6 +111,7 @@ class AppData extends ChangeNotifier {
         password: password,
       ),
     );
+    _saveUsers();
     notifyListeners();
     return true;
   }
@@ -93,6 +145,7 @@ class AppData extends ChangeNotifier {
         timestamp: DateTime.now(),
       ),
     );
+    _saveReviews();
     notifyListeners();
   }
 
@@ -154,21 +207,38 @@ class RateMateApp extends StatefulWidget {
 
 class _RateMateAppState extends State<RateMateApp> {
   final AppData data = AppData();
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    data.register('Ana Maria', 'ana.maria@gmail.com', 'password1234');
-    data.register(
-      'Rares Opritescu',
-      'rares.opritescu@gmail.com',
-      'password1234',
-    );
-    data.register('Dragan Mihai', 'mihai.dragan@gmail.com', 'password1234');
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await data.init();
+    // If no users, add initial ones
+    if (data.users.isEmpty) {
+      data.register('Ana Maria', 'ana.maria@gmail.com', 'password1234');
+      data.register(
+        'Rares Opritescu',
+        'rares.opritescu@gmail.com',
+        'password1234',
+      );
+      data.register('Dragan Mihai', 'mihai.dragan@gmail.com', 'password1234');
+    }
+    setState(() {
+      _initialized = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const MaterialApp(
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
     return MaterialApp(
       title: 'RateMate',
       theme: ThemeData(primarySwatch: Colors.indigo),
