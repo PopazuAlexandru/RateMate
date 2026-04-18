@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
 
@@ -26,12 +25,33 @@ class User {
   final String email;
   @HiveField(3)
   final String password;
+  @HiveField(4)
+  final String? profilePicturePath;
+  @HiveField(5)
+  final List<String> tags;
+  @HiveField(6)
+  final List<String> followers;
+  @HiveField(7)
+  final List<String> following;
+  @HiveField(8)
+  final bool isAdmin;
+  @HiveField(9)
+  final bool isBlocked;
+
   User({
     required this.id,
     required this.name,
     required this.email,
     required this.password,
-  });
+    this.profilePicturePath,
+    List<String>? tags,
+    List<String>? followers,
+    List<String>? following,
+    this.isAdmin = false,
+    this.isBlocked = false,
+  }) : tags = tags ?? [],
+       followers = followers ?? [],
+       following = following ?? [];
 }
 
 @HiveType(typeId: 1)
@@ -48,6 +68,11 @@ class Review {
   final String comment;
   @HiveField(5)
   final DateTime timestamp;
+  @HiveField(6)
+  final ReviewStatus status;
+  @HiveField(7)
+  final String? moderatorNote;
+
   Review({
     required this.id,
     required this.targetUserId,
@@ -55,7 +80,19 @@ class Review {
     required this.rating,
     required this.comment,
     required this.timestamp,
+    this.status = ReviewStatus.pending,
+    this.moderatorNote,
   });
+}
+
+@HiveType(typeId: 2)
+enum ReviewStatus {
+  @HiveField(0)
+  pending,
+  @HiveField(1)
+  approved,
+  @HiveField(2)
+  rejected,
 }
 
 class AppData extends ChangeNotifier {
@@ -75,10 +112,12 @@ class AppData extends ChangeNotifier {
     _loadData();
   }
 
+  @override
   Future<void> dispose() async {
     await _userBox.close();
     await _reviewBox.close();
     await _currentUserBox.close();
+    super.dispose();
   }
 
   void _loadData() {
@@ -155,13 +194,250 @@ class AppData extends ChangeNotifier {
         rating: rating,
         comment: comment.trim(),
         timestamp: DateTime.now(),
+        status: currentUser?.isAdmin == true
+            ? ReviewStatus.approved
+            : ReviewStatus.pending,
       ),
     );
     _saveReviews();
     notifyListeners();
   }
 
-  List<Review> getReviewsFor(String userId) =>
+  // Profile Picture Management
+  void updateProfilePicture(String userId, String? imagePath) {
+    final userIndex = _users.indexWhere((u) => u.id == userId);
+    if (userIndex != -1) {
+      final updatedUser = User(
+        id: _users[userIndex].id,
+        name: _users[userIndex].name,
+        email: _users[userIndex].email,
+        password: _users[userIndex].password,
+        profilePicturePath: imagePath,
+        tags: _users[userIndex].tags,
+        followers: _users[userIndex].followers,
+        following: _users[userIndex].following,
+        isAdmin: _users[userIndex].isAdmin,
+        isBlocked: _users[userIndex].isBlocked,
+      );
+      _users[userIndex] = updatedUser;
+      _saveUsers();
+      if (currentUser?.id == userId) {
+        currentUser = updatedUser;
+      }
+      notifyListeners();
+    }
+  }
+
+  // User Tags Management
+  void updateUserTags(String userId, List<String> tags) {
+    final userIndex = _users.indexWhere((u) => u.id == userId);
+    if (userIndex != -1) {
+      final updatedUser = User(
+        id: _users[userIndex].id,
+        name: _users[userIndex].name,
+        email: _users[userIndex].email,
+        password: _users[userIndex].password,
+        profilePicturePath: _users[userIndex].profilePicturePath,
+        tags: tags,
+        followers: _users[userIndex].followers,
+        following: _users[userIndex].following,
+        isAdmin: _users[userIndex].isAdmin,
+        isBlocked: _users[userIndex].isBlocked,
+      );
+      _users[userIndex] = updatedUser;
+      _saveUsers();
+      if (currentUser?.id == userId) {
+        currentUser = updatedUser;
+      }
+      notifyListeners();
+    }
+  }
+
+  // Following System
+  void followUser(String followerId, String targetUserId) {
+    if (followerId == targetUserId) return;
+
+    final followerIndex = _users.indexWhere((u) => u.id == followerId);
+    final targetIndex = _users.indexWhere((u) => u.id == targetUserId);
+
+    if (followerIndex != -1 && targetIndex != -1) {
+      final follower = _users[followerIndex];
+      final target = _users[targetIndex];
+
+      if (!follower.following.contains(targetUserId)) {
+        final updatedFollower = User(
+          id: follower.id,
+          name: follower.name,
+          email: follower.email,
+          password: follower.password,
+          profilePicturePath: follower.profilePicturePath,
+          tags: follower.tags,
+          followers: follower.followers,
+          following: [...follower.following, targetUserId],
+          isAdmin: follower.isAdmin,
+          isBlocked: follower.isBlocked,
+        );
+
+        final updatedTarget = User(
+          id: target.id,
+          name: target.name,
+          email: target.email,
+          password: target.password,
+          profilePicturePath: target.profilePicturePath,
+          tags: target.tags,
+          followers: [...target.followers, followerId],
+          following: target.following,
+          isAdmin: target.isAdmin,
+          isBlocked: target.isBlocked,
+        );
+
+        _users[followerIndex] = updatedFollower;
+        _users[targetIndex] = updatedTarget;
+        _saveUsers();
+
+        if (currentUser?.id == followerId) {
+          currentUser = updatedFollower;
+        }
+        notifyListeners();
+      }
+    }
+  }
+
+  void unfollowUser(String followerId, String targetUserId) {
+    final followerIndex = _users.indexWhere((u) => u.id == followerId);
+    final targetIndex = _users.indexWhere((u) => u.id == targetUserId);
+
+    if (followerIndex != -1 && targetIndex != -1) {
+      final follower = _users[followerIndex];
+      final target = _users[targetIndex];
+
+      final updatedFollower = User(
+        id: follower.id,
+        name: follower.name,
+        email: follower.email,
+        password: follower.password,
+        profilePicturePath: follower.profilePicturePath,
+        tags: follower.tags,
+        followers: follower.followers,
+        following: follower.following
+            .where((id) => id != targetUserId)
+            .toList(),
+        isAdmin: follower.isAdmin,
+        isBlocked: follower.isBlocked,
+      );
+
+      final updatedTarget = User(
+        id: target.id,
+        name: target.name,
+        email: target.email,
+        password: target.password,
+        profilePicturePath: target.profilePicturePath,
+        tags: target.tags,
+        followers: target.followers.where((id) => id != followerId).toList(),
+        following: target.following,
+        isAdmin: target.isAdmin,
+        isBlocked: target.isBlocked,
+      );
+
+      _users[followerIndex] = updatedFollower;
+      _users[targetIndex] = updatedTarget;
+      _saveUsers();
+
+      if (currentUser?.id == followerId) {
+        currentUser = updatedFollower;
+      }
+      notifyListeners();
+    }
+  }
+
+  bool isFollowing(String followerId, String targetUserId) {
+    final follower = _users.firstWhere(
+      (u) => u.id == followerId,
+      orElse: () => User(id: '', name: '', email: '', password: ''),
+    );
+    return follower.following.contains(targetUserId);
+  }
+
+  // Review Moderation
+  void moderateReview(
+    String reviewId,
+    ReviewStatus status, {
+    String? moderatorNote,
+  }) {
+    final reviewIndex = _reviews.indexWhere((r) => r.id == reviewId);
+    if (reviewIndex != -1) {
+      final review = _reviews[reviewIndex];
+      final updatedReview = Review(
+        id: review.id,
+        targetUserId: review.targetUserId,
+        submitterUserId: review.submitterUserId,
+        rating: review.rating,
+        comment: review.comment,
+        timestamp: review.timestamp,
+        status: status,
+        moderatorNote: moderatorNote,
+      );
+      _reviews[reviewIndex] = updatedReview;
+      _saveReviews();
+      notifyListeners();
+    }
+  }
+
+  // User Management (Admin)
+  void blockUser(String userId, bool blocked) {
+    final userIndex = _users.indexWhere((u) => u.id == userId);
+    if (userIndex != -1) {
+      final user = _users[userIndex];
+      final updatedUser = User(
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        password: user.password,
+        profilePicturePath: user.profilePicturePath,
+        tags: user.tags,
+        followers: user.followers,
+        following: user.following,
+        isAdmin: user.isAdmin,
+        isBlocked: blocked,
+      );
+      _users[userIndex] = updatedUser;
+      _saveUsers();
+      notifyListeners();
+    }
+  }
+
+  void makeAdmin(String userId, bool isAdmin) {
+    final userIndex = _users.indexWhere((u) => u.id == userId);
+    if (userIndex != -1) {
+      final user = _users[userIndex];
+      final updatedUser = User(
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        password: user.password,
+        profilePicturePath: user.profilePicturePath,
+        tags: user.tags,
+        followers: user.followers,
+        following: user.following,
+        isAdmin: isAdmin,
+        isBlocked: user.isBlocked,
+      );
+      _users[userIndex] = updatedUser;
+      _saveUsers();
+      notifyListeners();
+    }
+  }
+
+  List<Review> getReviewsFor(String userId) => _reviews
+      .where(
+        (r) => r.targetUserId == userId && r.status == ReviewStatus.approved,
+      )
+      .toList();
+
+  List<Review> getPendingReviews() =>
+      _reviews.where((r) => r.status == ReviewStatus.pending).toList();
+
+  List<Review> getAllReviewsFor(String userId) =>
       _reviews.where((r) => r.targetUserId == userId).toList();
 
   double averageRating(String userId) {
@@ -178,11 +454,40 @@ class AppData extends ChangeNotifier {
     return 'awesome person';
   }
 
-  List<User> searchUsers(String query) {
+  List<User> searchUsers(
+    String query, {
+    double? minRating,
+    double? maxRating,
+    List<String>? tags,
+    bool? followingOnly,
+  }) {
+    var filtered = _users.where((u) => u.id != currentUser?.id && !u.isBlocked);
+
+    // Text search
     final q = query.trim().toLowerCase();
-    final filtered = _users.where((u) => u.id != currentUser?.id);
-    if (q.isEmpty) return filtered.toList();
-    return filtered.where((u) => u.name.toLowerCase().contains(q)).toList();
+    if (q.isNotEmpty) {
+      filtered = filtered.where((u) => u.name.toLowerCase().contains(q));
+    }
+
+    // Rating filter
+    if (minRating != null) {
+      filtered = filtered.where((u) => averageRating(u.id) >= minRating);
+    }
+    if (maxRating != null) {
+      filtered = filtered.where((u) => averageRating(u.id) <= maxRating);
+    }
+
+    // Tag filter
+    if (tags != null && tags.isNotEmpty) {
+      filtered = filtered.where((u) => tags.any((tag) => u.tags.contains(tag)));
+    }
+
+    // Following filter
+    if (followingOnly == true && currentUser != null) {
+      filtered = filtered.where((u) => currentUser!.following.contains(u.id));
+    }
+
+    return filtered.toList();
   }
 
   Future<String> exportAccountsTxt() async {
@@ -386,17 +691,81 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String query = '';
+  double? minRating;
+  double? maxRating;
+  List<String> selectedTags = [];
+  bool followingOnly = false;
+  bool showFilters = false;
+  late AnimationController _fabAnimationController;
+  late Animation<double> _fabAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _fabAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fabAnimationController, curve: Curves.easeInOut),
+    );
+    _fabAnimationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fabAnimationController.dispose();
+    super.dispose();
+  }
+
+  void _toggleFilters() {
+    setState(() {
+      showFilters = !showFilters;
+    });
+  }
+
+  List<String> _getAllTags() {
+    final allTags = <String>{};
+    for (final user in widget.appData.users) {
+      allTags.addAll(user.tags);
+    }
+    return allTags.toList()..sort();
+  }
 
   @override
   Widget build(BuildContext context) {
     final current = widget.appData.currentUser!;
-    final candidates = widget.appData.searchUsers(query);
+    final candidates = widget.appData.searchUsers(
+      query,
+      minRating: minRating,
+      maxRating: maxRating,
+      tags: selectedTags.isNotEmpty ? selectedTags : null,
+      followingOnly: followingOnly,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('RateMate Home'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            tooltip: 'Advanced Filters',
+            onPressed: _toggleFilters,
+          ),
+          if (current.isAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Admin Panel',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AdminPanelScreen(appData: widget.appData),
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.reviews),
             tooltip: 'My Reviews',
@@ -435,6 +804,90 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 8),
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 300),
+              crossFadeState: showFilters
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: Container(),
+              secondChild: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Advanced Filters',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('Rating: '),
+                          Expanded(
+                            child: RangeSlider(
+                              values: RangeValues(
+                                minRating ?? 0,
+                                maxRating ?? 5,
+                              ),
+                              min: 0,
+                              max: 5,
+                              divisions: 10,
+                              labels: RangeLabels(
+                                (minRating ?? 0).toStringAsFixed(1),
+                                (maxRating ?? 5).toStringAsFixed(1),
+                              ),
+                              onChanged: (values) {
+                                setState(() {
+                                  minRating = values.start == 0
+                                      ? null
+                                      : values.start;
+                                  maxRating = values.end == 5
+                                      ? null
+                                      : values.end;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        children: _getAllTags().map((tag) {
+                          final isSelected = selectedTags.contains(tag);
+                          return FilterChip(
+                            label: Text(tag),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  selectedTags.add(tag);
+                                } else {
+                                  selectedTags.remove(tag);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('Following only: '),
+                          Switch(
+                            value: followingOnly,
+                            onChanged: (value) =>
+                                setState(() => followingOnly = value),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             const Text(
               'Find friends to review',
@@ -450,14 +903,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         final user = candidates[index];
                         final avgRating = widget.appData.averageRating(user.id);
                         final tag = widget.appData.getUserTag(user.id);
-                        return Card(
-                          child: ListTile(
-                            title: Text(user.name),
-                            subtitle: Text(
-                              'Rating: ${avgRating.toStringAsFixed(1)} / 5 from ${widget.appData.getReviewsFor(user.id).length} reviews\nTag: $tag',
+                        final isFollowing = widget.appData.isFollowing(
+                          current.id,
+                          user.id,
+                        );
+
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Dismissible(
+                            key: Key(user.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              color: Colors.blue,
+                              child: const Icon(
+                                Icons.rate_review,
+                                color: Colors.white,
+                              ),
                             ),
-                            trailing: const Icon(Icons.arrow_forward_ios),
-                            onTap: () {
+                            onDismissed: (direction) {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => ProfileScreen(
@@ -467,12 +934,97 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               );
                             },
+                            child: Card(
+                              elevation: 2,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage:
+                                      user.profilePicturePath != null
+                                      ? FileImage(
+                                          File(user.profilePicturePath!),
+                                        )
+                                      : null,
+                                  child: user.profilePicturePath == null
+                                      ? Text(user.name[0].toUpperCase())
+                                      : null,
+                                ),
+                                title: Text(user.name),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Rating: ${avgRating.toStringAsFixed(1)} / 5 from ${widget.appData.getReviewsFor(user.id).length} reviews',
+                                    ),
+                                    Text('Tag: $tag'),
+                                    if (user.tags.isNotEmpty)
+                                      Text(
+                                        'Tags: ${user.tags.join(", ")}',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        isFollowing
+                                            ? Icons.person_remove
+                                            : Icons.person_add,
+                                        color: isFollowing
+                                            ? Colors.red
+                                            : Colors.green,
+                                      ),
+                                      onPressed: () {
+                                        if (isFollowing) {
+                                          widget.appData.unfollowUser(
+                                            current.id,
+                                            user.id,
+                                          );
+                                        } else {
+                                          widget.appData.followUser(
+                                            current.id,
+                                            user.id,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    const Icon(Icons.arrow_forward_ios),
+                                  ],
+                                ),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ProfileScreen(
+                                        appData: widget.appData,
+                                        targetUser: user,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                         );
                       },
                     ),
             ),
           ],
+        ),
+      ),
+      floatingActionButton: ScaleTransition(
+        scale: _fabAnimation,
+        child: FloatingActionButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    ProfileScreen(appData: widget.appData, targetUser: current),
+              ),
+            );
+          },
+          tooltip: 'My Profile',
+          child: const Icon(Icons.person),
         ),
       ),
     );
@@ -492,10 +1044,12 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
 
   void _exportToTxt() async {
     final path = await widget.appData.exportAccountsTxt();
-    setState(() => exportPath = path);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Exported to: $path')));
+    if (mounted) {
+      setState(() => exportPath = path);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Exported to: $path')));
+    }
   }
 
   @override
@@ -697,6 +1251,298 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminPanelScreen extends StatefulWidget {
+  final AppData appData;
+  const AdminPanelScreen({required this.appData, super.key});
+
+  @override
+  State<AdminPanelScreen> createState() => _AdminPanelScreenState();
+}
+
+class _AdminPanelScreenState extends State<AdminPanelScreen>
+    with TickerProviderStateMixin {
+  int _selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Admin Panel')),
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (int index) {
+              setState(() {
+                _selectedIndex = index;
+              });
+            },
+            labelType: NavigationRailLabelType.selected,
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.people),
+                label: Text('Users'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.reviews),
+                label: Text('Reviews'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.analytics),
+                label: Text('Analytics'),
+              ),
+            ],
+          ),
+          const VerticalDivider(thickness: 1, width: 1),
+          Expanded(child: _buildContent()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildUserManagement();
+      case 1:
+        return _buildReviewModeration();
+      case 2:
+        return _buildAnalytics();
+      default:
+        return Container();
+    }
+  }
+
+  Widget _buildUserManagement() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'User Management',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.builder(
+              itemCount: widget.appData.users.length,
+              itemBuilder: (context, index) {
+                final user = widget.appData.users[index];
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: user.profilePicturePath != null
+                          ? FileImage(File(user.profilePicturePath!))
+                          : null,
+                      child: user.profilePicturePath == null
+                          ? Text(user.name[0].toUpperCase())
+                          : null,
+                    ),
+                    title: Text(user.name),
+                    subtitle: Text(
+                      '${user.email} • ${user.followers.length} followers • ${user.following.length} following',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            user.isAdmin
+                                ? Icons.admin_panel_settings
+                                : Icons.admin_panel_settings_outlined,
+                          ),
+                          onPressed: () {
+                            widget.appData.makeAdmin(user.id, !user.isAdmin);
+                          },
+                          tooltip: user.isAdmin ? 'Remove Admin' : 'Make Admin',
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            user.isBlocked ? Icons.block : Icons.check_circle,
+                          ),
+                          color: user.isBlocked ? Colors.red : Colors.green,
+                          onPressed: () {
+                            widget.appData.blockUser(user.id, !user.isBlocked);
+                          },
+                          tooltip: user.isBlocked
+                              ? 'Unblock User'
+                              : 'Block User',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewModeration() {
+    final pendingReviews = widget.appData.getPendingReviews();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Review Moderation (${pendingReviews.length} pending)',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: pendingReviews.isEmpty
+                ? const Center(child: Text('No reviews pending moderation'))
+                : ListView.builder(
+                    itemCount: pendingReviews.length,
+                    itemBuilder: (context, index) {
+                      final review = pendingReviews[index];
+                      final targetUser = widget.appData.users.firstWhere(
+                        (u) => u.id == review.targetUserId,
+                        orElse: () => User(
+                          id: '',
+                          name: 'Unknown',
+                          email: '',
+                          password: '',
+                        ),
+                      );
+
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Review for: ${targetUser.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text('Rating: ${review.rating}/5'),
+                              Text('Comment: ${review.comment}'),
+                              Text('Submitted: ${review.timestamp.toString()}'),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      widget.appData.moderateReview(
+                                        review.id,
+                                        ReviewStatus.approved,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                    ),
+                                    child: const Text('Approve'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      widget.appData.moderateReview(
+                                        review.id,
+                                        ReviewStatus.rejected,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    child: const Text('Reject'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalytics() {
+    final totalUsers = widget.appData.users.length;
+    final totalReviews = widget.appData.reviews.length;
+    final approvedReviews = widget.appData.reviews
+        .where((r) => r.status == ReviewStatus.approved)
+        .length;
+    final averageRating = widget.appData.users.isEmpty
+        ? 0.0
+        : widget.appData.users
+                  .map((u) => widget.appData.averageRating(u.id))
+                  .reduce((a, b) => a + b) /
+              widget.appData.users.length;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Analytics',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            childAspectRatio: 2,
+            children: [
+              _buildStatCard(
+                'Total Users',
+                totalUsers.toString(),
+                Icons.people,
+              ),
+              _buildStatCard(
+                'Total Reviews',
+                totalReviews.toString(),
+                Icons.reviews,
+              ),
+              _buildStatCard(
+                'Approved Reviews',
+                approvedReviews.toString(),
+                Icons.check_circle,
+              ),
+              _buildStatCard(
+                'Average Rating',
+                averageRating.toStringAsFixed(1),
+                Icons.star,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 32, color: Theme.of(context).primaryColor),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            Text(title, style: const TextStyle(color: Colors.grey)),
           ],
         ),
       ),
