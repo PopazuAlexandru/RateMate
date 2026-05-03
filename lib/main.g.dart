@@ -21,13 +21,19 @@ class UserAdapter extends TypeAdapter<User> {
       name: fields[1] as String,
       email: fields[2] as String,
       password: fields[3] as String,
+      profilePicturePath: fields[4] as String?,
+      tags: (fields[5] as List?)?.cast<String>(),
+      followers: (fields[6] as List?)?.cast<String>(),
+      following: (fields[7] as List?)?.cast<String>(),
+      isAdmin: fields[8] as bool,
+      isBlocked: fields[9] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, User obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -35,7 +41,19 @@ class UserAdapter extends TypeAdapter<User> {
       ..writeByte(2)
       ..write(obj.email)
       ..writeByte(3)
-      ..write(obj.password);
+      ..write(obj.password)
+      ..writeByte(4)
+      ..write(obj.profilePicturePath)
+      ..writeByte(5)
+      ..write(obj.tags)
+      ..writeByte(6)
+      ..write(obj.followers)
+      ..writeByte(7)
+      ..write(obj.following)
+      ..writeByte(8)
+      ..write(obj.isAdmin)
+      ..writeByte(9)
+      ..write(obj.isBlocked);
   }
 
   @override
@@ -66,13 +84,16 @@ class ReviewAdapter extends TypeAdapter<Review> {
       rating: fields[3] as int,
       comment: fields[4] as String,
       timestamp: fields[5] as DateTime,
+      status: fields[6] as ReviewStatus,
+      moderatorNote: fields[7] as String?,
+      tag: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Review obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -84,7 +105,13 @@ class ReviewAdapter extends TypeAdapter<Review> {
       ..writeByte(4)
       ..write(obj.comment)
       ..writeByte(5)
-      ..write(obj.timestamp);
+      ..write(obj.timestamp)
+      ..writeByte(6)
+      ..write(obj.status)
+      ..writeByte(7)
+      ..write(obj.moderatorNote)
+      ..writeByte(8)
+      ..write(obj.tag);
   }
 
   @override
@@ -94,6 +121,50 @@ class ReviewAdapter extends TypeAdapter<Review> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ReviewAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class ReviewStatusAdapter extends TypeAdapter<ReviewStatus> {
+  @override
+  final int typeId = 2;
+
+  @override
+  ReviewStatus read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return ReviewStatus.pending;
+      case 1:
+        return ReviewStatus.approved;
+      case 2:
+        return ReviewStatus.rejected;
+      default:
+        return ReviewStatus.pending;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, ReviewStatus obj) {
+    switch (obj) {
+      case ReviewStatus.pending:
+        writer.writeByte(0);
+        break;
+      case ReviewStatus.approved:
+        writer.writeByte(1);
+        break;
+      case ReviewStatus.rejected:
+        writer.writeByte(2);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReviewStatusAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
