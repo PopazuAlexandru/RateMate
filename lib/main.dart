@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 import 'screens/auth_screen.dart';
+import 'screens/admin_screen.dart';
 import 'screens/home_screen.dart';
 
 part 'main.g.dart';
@@ -651,6 +652,9 @@ class _RateMateAppState extends State<RateMateApp> with WidgetsBindingObserver {
         colorScheme: ColorScheme.light(primary: AppDesignTokens.primary),
         fontFamily: AppDesignTokens.fontFamily,
       ),
+      routes: {
+        '/admin': (_) => AdminPanelScreen(appData: data),
+      },
       home: AnimatedBuilder(
         animation: data,
         builder: (context, child) => data.currentUser == null

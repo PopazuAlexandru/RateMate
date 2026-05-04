@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'profile_screen.dart';
-import 'admin_screen.dart';
 import 'my_reviews_screen.dart';
 
 // ============================================================================
@@ -19,34 +18,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   String query = '';
   double? minRating;
   double? maxRating;
   List<String> selectedTags = [];
   bool followingOnly = false;
   bool showFilters = false;
-  late AnimationController _fabAnimationController;
-  late Animation<double> _fabAnimation;
 
-  @override
-  void initState() {
-    super.initState();
-    _fabAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _fabAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fabAnimationController, curve: Curves.easeInOut),
-    );
-    _fabAnimationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _fabAnimationController.dispose();
-    super.dispose();
-  }
 
   void _toggleFilters() {
     setState(() {
@@ -92,18 +71,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             tooltip: 'Advanced Filters',
             onPressed: _toggleFilters,
           ),
-          if (current.isAdmin)
-            IconButton(
-              icon: const Icon(Icons.admin_panel_settings, color: Colors.black),
-              tooltip: 'Admin Panel',
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AdminPanelScreen(appData: widget.appData),
-                  ),
-                );
-              },
-            ),
           IconButton(
             icon: const Icon(
               Icons.reviews,
@@ -233,28 +200,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              if (current.isAdmin) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              AdminPanelScreen(appData: widget.appData),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.admin_panel_settings),
-                    label: const Text('Admin Settings'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppDesignTokens.secondary,
-                      foregroundColor: AppDesignTokens.secondaryForeground,
-                    ),
-                  ),
-                ),
-              ],
               const SizedBox(height: 20),
               // Search Field
               Container(
@@ -678,22 +623,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
       ),
-      floatingActionButton: current.isAdmin
-          ? ScaleTransition(
-              scale: _fabAnimation,
-              child: FloatingActionButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => AdminPanelScreen(appData: widget.appData),
-                    ),
-                  );
-                },
-                tooltip: 'Admin Settings',
-                child: const Icon(Icons.admin_panel_settings),
-              ),
-            )
-          : null,
     );
   }
 }
