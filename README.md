@@ -5,6 +5,17 @@
 ## Project Description
 **RateMate** is a mobile application built with Flutter and Hive, designed as a social review platform where users can rate and review other people in a structured and moderated environment. The app focuses on simplicity, offline functionality, and user interaction through ratings, comments, and social connections.
 
+## Technical Stack
+
+RateMate is built on a modern, high-performance architecture designed for speed and offline reliability.
+
+*   **Flutter (UI Framework)**: Leveraged for high-performance, cross-platform mobile development with a consistent look and feel.
+*   **Dart (Logic Layer)**: The primary programming language used to drive the application's core business logic.
+*   **Hive (Local NoSQL Database)**: A lightweight, lightning-fast key-value database that handles local data storage and offline persistence.
+*   **path_provider**: Manages secure access to the mobile device's file system for reliable data management.
+*   **UUID**: Ensures every user, review, and entry has a distinct, unique identifier to maintain data integrity.
+*   **Provider / ChangeNotifier**: Implements a reactive state management pattern to ensure the UI updates instantly as data changes.
+
 ### Key Screens & Features:
 * **Authentication (Login / Sign-Up):** A simple authentication system that allows users to create accounts and log in using email and password. User sessions are persisted locally, enabling automatic login on app restart.
 * **Home Dashboard:** The main screen of the application where users can view their profile summary, including average rating and descriptive tags. It also provides access to search functionality, user lists, and navigation to other core features.
@@ -14,6 +25,31 @@
 * **Social Features (Following System):** Users can follow or unfollow others, creating a simple social network structure. This relationship is reflected in both follower and following lists.
 * **Admin & Moderation System:** The application includes role-based functionality where admin users can manage the platform by approving or deleting reviews or blocking users. 
 * **Local Data Storage (Hive):** All data, including users, reviews, and session state, is stored locally using Hive, a lightweight NoSQL database. This enables the app to function fully offline without requiring a backend server.
+
+### Project Structure
+```
+lib/
+├── screens/                  # Application UI pages
+│   ├── admin_screen.dart     # Admin & moderation hub
+│   ├── auth_screen.dart      # Login & Sign-up logic
+│   ├── home_screen.dart      # Main dashboard & user discovery
+│   ├── my_reviews_screen.dart # Personal feedback view
+│   └── profile_screen.dart   # User profile details
+├── main.dart                 # App entry point & Hive setup
+└── main.g.dart               # Generated Hive adapters
+```
+
+## Visuals
+
+### Authentication Flow
+| Log In | Sign Up |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/376424f9-9553-4d1c-975f-0526fd017025" width="250"> | <img src="https://github.com/user-attachments/assets/6f9b8aa0-ca93-4f3a-a1d7-7fb7a64bc527" width="250"> |
+
+### Core Experience
+| Main Dashboard | Admin Panel | Review Page |
+| :---: | :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/5c11da2b-05d6-46cf-a1c0-7df598ec426d" width="250"> | <img src="https://github.com/user-attachments/assets/8757a9ee-787b-49e9-aae6-ee89a36cb92d" width="250"> | <img src="https://github.com/user-attachments/assets/ec296885-7ac1-4b16-8468-e03b41e53328" width="250" />
 
 ## Getting Started
 
@@ -29,17 +65,6 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-## Visuals
-
-### Authentication Flow
-| Log In | Sign Up |
-| :---: | :---: |
-| <img src="https://github.com/user-attachments/assets/376424f9-9553-4d1c-975f-0526fd017025" width="250"> | <img src="https://github.com/user-attachments/assets/6f9b8aa0-ca93-4f3a-a1d7-7fb7a64bc527" width="250"> |
-
-### Core Experience
-| Main Dashboard | Admin Panel |
-| :---: | :---: |
-| <img src="https://github.com/user-attachments/assets/5c11da2b-05d6-46cf-a1c0-7df598ec426d" width="250"> | <img src="https://github.com/user-attachments/assets/8757a9ee-787b-49e9-aae6-ee89a36cb92d" width="250"> |
 
 
 
