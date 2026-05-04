@@ -88,14 +88,28 @@ class AppDesignTokens {
   }
 }
 
+// void main() async {
+//   WidgetsFlutterBinding.ensureInitialized();
+//   // Initialize Hive for Flutter - required for web IndexedDB support
+//   await Hive.initFlutter();
+//   // Register all adapters before opening any boxes
+//   Hive.registerAdapter(UserAdapter());
+//   Hive.registerAdapter(ReviewAdapter());
+//   Hive.registerAdapter(ReviewStatusAdapter());
+//   runApp(const RateMateApp());
+// }
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
   // Initialize Hive for Flutter - required for web IndexedDB support
   await Hive.initFlutter();
-  // Register all adapters before opening any boxes
+  
+  // Register all adapters
   Hive.registerAdapter(UserAdapter());
   Hive.registerAdapter(ReviewAdapter());
   Hive.registerAdapter(ReviewStatusAdapter());
+  
   runApp(const RateMateApp());
 }
 
@@ -223,25 +237,41 @@ class AppData extends ChangeNotifier {
     super.dispose();
   }
 
+  // void _loadData() {
+  //   _users.clear();
+  //   _users.addAll(_userBox.values);
+  //   _reviews.clear();
+  //   _reviews.addAll(_reviewBox.values);
+
+  //   final persistedUserId = _currentUserBox.get('id');
+  //   if (persistedUserId != null) {
+  //     final restoredUser = _users.firstWhere(
+  //       (u) => u.id == persistedUserId,
+  //       orElse: () => User(id: '', name: '', email: '', password: ''),
+  //     );
+  //     currentUser = restoredUser.id.isNotEmpty ? restoredUser : null;
+  //   } else {
+  //     currentUser = null;
+  //   }
+
+  //   notifyListeners();
+  // }
+
   void _loadData() {
-    _users.clear();
-    _users.addAll(_userBox.values);
-    _reviews.clear();
-    _reviews.addAll(_reviewBox.values);
+  _users.clear();
+  _users.addAll(_userBox.values);
+  _reviews.clear();
+  _reviews.addAll(_reviewBox.values);
 
-    final persistedUserId = _currentUserBox.get('id');
-    if (persistedUserId != null) {
-      final restoredUser = _users.firstWhere(
-        (u) => u.id == persistedUserId,
-        orElse: () => User(id: '', name: '', email: '', password: ''),
-      );
-      currentUser = restoredUser.id.isNotEmpty ? restoredUser : null;
-    } else {
-      currentUser = null;
-    }
-
-    notifyListeners();
-  }
+  // ALWAYS set currentUser to null on app startup
+  // This forces the AuthScreen to show instead of the HomeScreen
+  currentUser = null; 
+  
+  // Optional: Clear the 'remember me' ID from Hive if you were using one
+  _currentUserBox.delete('id'); 
+  
+  notifyListeners();
+}
 
   Future<void> _saveUsers() async {
     await _userBox.clear();
