@@ -71,6 +71,17 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Advanced Filters',
             onPressed: _toggleFilters,
           ),
+          if (current.email == 'alexandru.popazu@gmail.com')
+            IconButton(
+              icon: const Icon(
+                Icons.admin_panel_settings_outlined,
+                color: Color(0xFF1A1A1A),
+              ),
+              tooltip: 'Admin Panel',
+              onPressed: () {
+                Navigator.of(context).pushNamed('/admin');
+              },
+            ),
           IconButton(
             icon: const Icon(
               Icons.reviews,
