@@ -90,7 +90,9 @@ class AppDesignTokens {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize Hive for Flutter - required for web IndexedDB support
   await Hive.initFlutter();
+  // Register all adapters before opening any boxes
   Hive.registerAdapter(UserAdapter());
   Hive.registerAdapter(ReviewAdapter());
   Hive.registerAdapter(ReviewStatusAdapter());
@@ -193,9 +195,23 @@ class AppData extends ChangeNotifier {
   User? currentUser;
 
   Future<void> init() async {
-    _userBox = await Hive.openBox<User>('users');
-    _reviewBox = await Hive.openBox<Review>('reviews');
-    _currentUserBox = await Hive.openBox<String>('currentUser');
+    // Open boxes once and reuse them throughout the app
+    // Do not close and reopen boxes to maintain persistence on web
+    if (!Hive.isBoxOpen('users')) {
+      _userBox = await Hive.openBox<User>('users');
+    } else {
+      _userBox = Hive.box<User>('users');
+    }
+    if (!Hive.isBoxOpen('reviews')) {
+      _reviewBox = await Hive.openBox<Review>('reviews');
+    } else {
+      _reviewBox = Hive.box<Review>('reviews');
+    }
+    if (!Hive.isBoxOpen('currentUser')) {
+      _currentUserBox = await Hive.openBox<String>('currentUser');
+    } else {
+      _currentUserBox = Hive.box<String>('currentUser');
+    }
     _loadData();
   }
 
@@ -232,6 +248,8 @@ class AppData extends ChangeNotifier {
     for (var user in _users) {
       await _userBox.put(user.id, user);
     }
+    // Ensure data is flushed to IndexedDB on web
+    await _userBox.flush();
   }
 
   Future<void> _saveReviews() async {
@@ -240,6 +258,8 @@ class AppData extends ChangeNotifier {
       for (var review in _reviews) {
         await _reviewBox.put(review.id, review);
       }
+      // Ensure data is flushed to IndexedDB on web
+      await _reviewBox.flush();
     } catch (e) {
       // Data persistence error
     }
@@ -297,28 +317,33 @@ class AppData extends ChangeNotifier {
     String comment,
     String? tag,
   ) async {
-    _reviews.add(
-      Review(
-        id: _uuid.v4(),
-        targetUserId: targetUserId,
-        submitterUserId: reviewerId,
-        rating: rating,
-        comment: comment.trim(),
-        timestamp: DateTime.now(),
-        status: currentUser?.isAdmin == true
-            ? ReviewStatus.approved
-            : ReviewStatus.pending,
-        tag: tag,
-      ),
+    final newReview = Review(
+      id: _uuid.v4(),
+      targetUserId: targetUserId,
+      submitterUserId: reviewerId,
+      rating: rating,
+      comment: comment.trim(),
+      timestamp: DateTime.now(),
+      status: currentUser?.isAdmin == true
+          ? ReviewStatus.approved
+          : ReviewStatus.pending,
+      tag: tag,
     );
-    await _saveReviews();
+    _reviews.add(newReview);
+    // Directly persist to Hive with await to ensure write completes
+    await _reviewBox.put(newReview.id, newReview);
+    // Ensure data is flushed to IndexedDB on web
+    await _reviewBox.flush();
     notifyListeners();
   }
 
   // User Management (Admin & Moderation)
   Future<void> deleteReview(String reviewId) async {
     _reviews.removeWhere((r) => r.id == reviewId);
-    await _saveReviews();
+    // Directly persist deletion to Hive
+    await _reviewBox.delete(reviewId);
+    // Ensure data is flushed to IndexedDB on web
+    await _reviewBox.flush();
     notifyListeners();
   }
 
