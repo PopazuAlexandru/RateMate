@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 
-// ============================================================================
-// MY REVIEWS SCREEN - Rate Mate
-// ============================================================================
-// Shows reviews received by the current user (Anonymized)
-// Uses Pacifico for header, Quicksand for text, 16px border radius
-// ============================================================================
-
 class MyReviewsScreen extends StatefulWidget {
   final AppData appData;
   const MyReviewsScreen({required this.appData, super.key});
@@ -20,7 +13,6 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     final current = widget.appData.currentUser!;
-    // Logic Update: Only reviews where targetUserId matches currentUser.id
     final allReviews =
         widget.appData.reviews
             .where((r) => r.targetUserId == current.id)
@@ -123,7 +115,6 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Anonymity: Hardcode the reviewer name as 'Secret Admirer'
                                     const Text(
                                       'Secret Admirer',
                                       style: TextStyle(
@@ -174,7 +165,6 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // Use Quicksand for the review text
                           Text(
                             review.comment,
                             style: const TextStyle(

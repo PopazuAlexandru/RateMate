@@ -3,13 +3,6 @@ import '../main.dart';
 import 'profile_screen.dart';
 import 'my_reviews_screen.dart';
 
-// ============================================================================
-// HOME SCREEN - Rate Mate
-// ============================================================================
-// User listing and search with Quicksand font, 16px border radius,
-// and Gold/Gray star colors for ratings
-// ============================================================================
-
 class HomeScreen extends StatefulWidget {
   final AppData appData;
   const HomeScreen({required this.appData, super.key});
@@ -25,7 +18,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> selectedTags = [];
   bool followingOnly = false;
   bool showFilters = false;
-
 
   void _toggleFilters() {
     setState(() {
@@ -124,7 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -212,7 +203,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Search Field
               Container(
                 decoration: BoxDecoration(
                   color: AppDesignTokens.card,

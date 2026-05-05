@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 
-// ============================================================================
-// PROFILE SCREEN - Rate Mate
-// ============================================================================
-// User profile view with reviews and rating submission
-// Uses Quicksand font, 16px border radius, Gold/Gray stars
-// ============================================================================
-
 class ProfileScreen extends StatefulWidget {
   final AppData appData;
   final User targetUser;
@@ -256,7 +249,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Write Review Section
               if (widget.targetUser.id != current.id) ...[
                 const Text(
                   'Write a Review',
@@ -285,7 +277,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Star rating selector
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
@@ -394,7 +385,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 24),
               ],
-              // Reviews List
               Text(
                 'Reviews (${reviews.length})',
                 style: const TextStyle(

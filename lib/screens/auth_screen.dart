@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 
-// ============================================================================
-// AUTH SCREEN - Rate Mate
-// ============================================================================
-// Login/Register functionality with Blue-Cyan gradient background
-// and Pacifico font for logo text
-// ============================================================================
-
 class AuthScreen extends StatefulWidget {
   final AppData appData;
   const AuthScreen({required this.appData, super.key});
@@ -62,10 +55,9 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!success) {
       if (!mounted) return;
       setState(
-        () => error =
-            isLogin
-                ? 'Login failed: check credentials'
-                : 'Registration failed: email already used',
+        () => error = isLogin
+            ? 'Login failed: check credentials'
+            : 'Registration failed: email already used',
       );
       return;
     }
@@ -74,7 +66,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Blue-Cyan gradient background as requested
     return Scaffold(
       backgroundColor: AppDesignTokens.background,
       body: Container(
@@ -272,7 +263,6 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Using elevatedButtonTheme style from main.dart
                 SizedBox(
                   height: 52,
                   child: ElevatedButton(
@@ -297,7 +287,9 @@ class _AuthScreenState extends State<AuthScreen> {
                           : 'Already have an account? Login',
                       style: TextStyle(
                         fontFamily: AppDesignTokens.fontFamily,
-                        color: AppDesignTokens.primaryForeground.withOpacity(0.9),
+                        color: AppDesignTokens.primaryForeground.withOpacity(
+                          0.9,
+                        ),
                       ),
                     ),
                   ),

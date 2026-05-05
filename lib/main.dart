@@ -5,14 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 import 'screens/auth_screen.dart';
-import 'screens/admin_screen.dart';
 import 'screens/home_screen.dart';
 
 part 'main.g.dart';
-
-// ============================================================================
-// RATE MATE DESIGN TOKENS
-// ============================================================================
 
 class AppDesignTokens {
   // Typography
@@ -88,28 +83,12 @@ class AppDesignTokens {
   }
 }
 
-// void main() async {
-//   WidgetsFlutterBinding.ensureInitialized();
-//   // Initialize Hive for Flutter - required for web IndexedDB support
-//   await Hive.initFlutter();
-//   // Register all adapters before opening any boxes
-//   Hive.registerAdapter(UserAdapter());
-//   Hive.registerAdapter(ReviewAdapter());
-//   Hive.registerAdapter(ReviewStatusAdapter());
-//   runApp(const RateMateApp());
-// }
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Hive for Flutter - required for web IndexedDB support
   await Hive.initFlutter();
-  
-  // Register all adapters
   Hive.registerAdapter(UserAdapter());
   Hive.registerAdapter(ReviewAdapter());
   Hive.registerAdapter(ReviewStatusAdapter());
-  
   runApp(const RateMateApp());
 }
 
@@ -209,23 +188,9 @@ class AppData extends ChangeNotifier {
   User? currentUser;
 
   Future<void> init() async {
-    // Open boxes once and reuse them throughout the app
-    // Do not close and reopen boxes to maintain persistence on web
-    if (!Hive.isBoxOpen('users')) {
-      _userBox = await Hive.openBox<User>('users');
-    } else {
-      _userBox = Hive.box<User>('users');
-    }
-    if (!Hive.isBoxOpen('reviews')) {
-      _reviewBox = await Hive.openBox<Review>('reviews');
-    } else {
-      _reviewBox = Hive.box<Review>('reviews');
-    }
-    if (!Hive.isBoxOpen('currentUser')) {
-      _currentUserBox = await Hive.openBox<String>('currentUser');
-    } else {
-      _currentUserBox = Hive.box<String>('currentUser');
-    }
+    _userBox = await Hive.openBox<User>('users');
+    _reviewBox = await Hive.openBox<Review>('reviews');
+    _currentUserBox = await Hive.openBox<String>('currentUser');
     _loadData();
   }
 
@@ -237,49 +202,31 @@ class AppData extends ChangeNotifier {
     super.dispose();
   }
 
-  // void _loadData() {
-  //   _users.clear();
-  //   _users.addAll(_userBox.values);
-  //   _reviews.clear();
-  //   _reviews.addAll(_reviewBox.values);
-
-  //   final persistedUserId = _currentUserBox.get('id');
-  //   if (persistedUserId != null) {
-  //     final restoredUser = _users.firstWhere(
-  //       (u) => u.id == persistedUserId,
-  //       orElse: () => User(id: '', name: '', email: '', password: ''),
-  //     );
-  //     currentUser = restoredUser.id.isNotEmpty ? restoredUser : null;
-  //   } else {
-  //     currentUser = null;
-  //   }
-
-  //   notifyListeners();
-  // }
-
   void _loadData() {
-  _users.clear();
-  _users.addAll(_userBox.values);
-  _reviews.clear();
-  _reviews.addAll(_reviewBox.values);
+    _users.clear();
+    _users.addAll(_userBox.values);
+    _reviews.clear();
+    _reviews.addAll(_reviewBox.values);
 
-  // ALWAYS set currentUser to null on app startup
-  // This forces the AuthScreen to show instead of the HomeScreen
-  currentUser = null; 
-  
-  // Optional: Clear the 'remember me' ID from Hive if you were using one
-  _currentUserBox.delete('id'); 
-  
-  notifyListeners();
-}
+    final persistedUserId = _currentUserBox.get('id');
+    if (persistedUserId != null) {
+      final restoredUser = _users.firstWhere(
+        (u) => u.id == persistedUserId,
+        orElse: () => User(id: '', name: '', email: '', password: ''),
+      );
+      currentUser = restoredUser.id.isNotEmpty ? restoredUser : null;
+    } else {
+      currentUser = null;
+    }
+
+    notifyListeners();
+  }
 
   Future<void> _saveUsers() async {
     await _userBox.clear();
     for (var user in _users) {
       await _userBox.put(user.id, user);
     }
-    // Ensure data is flushed to IndexedDB on web
-    await _userBox.flush();
   }
 
   Future<void> _saveReviews() async {
@@ -288,11 +235,7 @@ class AppData extends ChangeNotifier {
       for (var review in _reviews) {
         await _reviewBox.put(review.id, review);
       }
-      // Ensure data is flushed to IndexedDB on web
-      await _reviewBox.flush();
-    } catch (e) {
-      // Data persistence error
-    }
+    } catch (e) {}
   }
 
   List<User> get users => List.unmodifiable(_users);
@@ -347,33 +290,28 @@ class AppData extends ChangeNotifier {
     String comment,
     String? tag,
   ) async {
-    final newReview = Review(
-      id: _uuid.v4(),
-      targetUserId: targetUserId,
-      submitterUserId: reviewerId,
-      rating: rating,
-      comment: comment.trim(),
-      timestamp: DateTime.now(),
-      status: currentUser?.isAdmin == true
-          ? ReviewStatus.approved
-          : ReviewStatus.pending,
-      tag: tag,
+    _reviews.add(
+      Review(
+        id: _uuid.v4(),
+        targetUserId: targetUserId,
+        submitterUserId: reviewerId,
+        rating: rating,
+        comment: comment.trim(),
+        timestamp: DateTime.now(),
+        status: currentUser?.isAdmin == true
+            ? ReviewStatus.approved
+            : ReviewStatus.pending,
+        tag: tag,
+      ),
     );
-    _reviews.add(newReview);
-    // Directly persist to Hive with await to ensure write completes
-    await _reviewBox.put(newReview.id, newReview);
-    // Ensure data is flushed to IndexedDB on web
-    await _reviewBox.flush();
+    await _saveReviews();
     notifyListeners();
   }
 
   // User Management (Admin & Moderation)
   Future<void> deleteReview(String reviewId) async {
     _reviews.removeWhere((r) => r.id == reviewId);
-    // Directly persist deletion to Hive
-    await _reviewBox.delete(reviewId);
-    // Ensure data is flushed to IndexedDB on web
-    await _reviewBox.flush();
+    await _saveReviews();
     notifyListeners();
   }
 
@@ -707,9 +645,6 @@ class _RateMateAppState extends State<RateMateApp> with WidgetsBindingObserver {
         colorScheme: ColorScheme.light(primary: AppDesignTokens.primary),
         fontFamily: AppDesignTokens.fontFamily,
       ),
-      routes: {
-        '/admin': (_) => AdminPanelScreen(appData: data),
-      },
       home: AnimatedBuilder(
         animation: data,
         builder: (context, child) => data.currentUser == null

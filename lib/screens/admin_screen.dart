@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 
-// ============================================================================
-// ADMIN SCREEN - Rate Mate
-// ============================================================================
-// Admin panel for user moderation and review oversight
-// Uses Quicksand font, 16px border radius
-// ============================================================================
-
 class AdminPanelScreen extends StatefulWidget {
   final AppData appData;
   const AdminPanelScreen({required this.appData, super.key});
@@ -182,7 +175,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                               fontFamily: AppDesignTokens.fontFamily,
                             ),
                           ),
-                          // Admin Oversight: Full details including submitterUserId
                           Text(
                             'From: ${submitter.name} (${review.submitterUserId ?? "Anonymous"})',
                             style: const TextStyle(
